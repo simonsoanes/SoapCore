@@ -13,16 +13,16 @@ namespace SoapCore.Meta
 	public static class BodyWriterExtensions
 	{
 		//switches to easily revert to previous behaviour if there is a problem
-		private static bool useXmlSchemaProvider = true;
-		private static bool useXmlReflectionImporter = false;
-		public static bool TryAddSchemaTypeFromXmlSchemaProviderAttribute(this XmlDictionaryWriter writer, Type type, string name, SoapSerializer serializer, XmlNamespaceManager xmlNamespaceManager = null)
+		private static readonly bool UseXmlSchemaProvider = true;
+		private static readonly bool UseXmlReflectionImporter = false;
+		public static bool TryAddSchemaTypeFromXmlSchemaProviderAttribute(this XmlDictionaryWriter writer, Type type, string name, SoapSerializer serializer, XmlNamespaceManager xmlNamespaceManager = null, bool isUnqualified = false)
 		{
-			if (!useXmlSchemaProvider && !useXmlReflectionImporter)
+			if (!UseXmlSchemaProvider && !UseXmlReflectionImporter)
 			{
 				return false;
 			}
 
-			if (useXmlReflectionImporter)
+			if (UseXmlReflectionImporter)
 			{
 				var schemas = new XmlSchemas();
 				var xmlImporter = new XmlReflectionImporter();
@@ -37,6 +37,7 @@ namespace SoapCore.Meta
 				{
 					schema.Write(memoryStream);
 				}
+
 				memoryStream.Position = 0;
 
 				var streamReader = new StreamReader(memoryStream);
@@ -58,6 +59,7 @@ namespace SoapCore.Meta
 				{
 					schema.Namespaces = xmlNamespaceManager.Convert();
 				}
+
 				if (xmlSchemaProviderAttribute.IsAny)
 				{
 					//MetaWCFBodyWriter usage....
@@ -82,22 +84,45 @@ namespace SoapCore.Meta
 						MinOccurs = 0,
 						MaxOccurs = 1,
 						Name = name,
-						IsNillable = serializer == SoapSerializer.DataContractSerializer ? true : false,
+						IsNillable = serializer == SoapSerializer.DataContractSerializer,
 						SchemaType = complex
 					};
+					if (isUnqualified)
+					{
+						element.Form = XmlSchemaForm.Unqualified;
+					}
+
 					schema.Items.Add(element);
 				}
 				else
 				{
 					var methodInfo = type.GetMethod(xmlSchemaProviderAttribute.MethodName, BindingFlags.Static | BindingFlags.Public);
-					var xmlSchemaType = (XmlSchemaType)methodInfo.Invoke(null, new object[] { xmlSchemaSet });
+					var xmlSchemaInfoObject = methodInfo.Invoke(null, new object[] { xmlSchemaSet });
 					var element = new XmlSchemaElement()
 					{
 						MinOccurs = 0,
 						MaxOccurs = 1,
 						Name = name,
-						SchemaType = xmlSchemaType
 					};
+
+					if (xmlSchemaInfoObject is XmlQualifiedName xmlQualifiedName)
+					{
+						element.SchemaTypeName = xmlQualifiedName;
+					}
+					else if (xmlSchemaInfoObject is XmlSchemaType xmlSchemaType)
+					{
+						element.SchemaType = xmlSchemaType;
+					}
+					else
+					{
+						throw new InvalidOperationException($"Invalid {nameof(xmlSchemaInfoObject)} type: {xmlSchemaInfoObject.GetType()}");
+					}
+
+					if (isUnqualified)
+					{
+						element.Form = XmlSchemaForm.Unqualified;
+					}
+
 					schema.Items.Add(element);
 				}
 
@@ -118,15 +143,21 @@ namespace SoapCore.Meta
 			return false;
 		}
 
-		public static bool IsAttribute(this PropertyInfo property)
+		public static bool IsChoice(this MemberInfo member)
 		{
-			var attributeItem = property.GetCustomAttribute<XmlAttributeAttribute>();
+			var choiceItem = member.GetCustomAttribute<XmlChoiceIdentifierAttribute>();
+			return choiceItem != null;
+		}
+
+		public static bool IsAttribute(this MemberInfo member)
+		{
+			var attributeItem = member.GetCustomAttribute<XmlAttributeAttribute>();
 			return attributeItem != null;
 		}
 
-		public static bool IsIgnored(this PropertyInfo property)
+		public static bool IsIgnored(this MemberInfo member)
 		{
-			return property
+			return member
 				.CustomAttributes
 				.Any(attr =>
 					attr.AttributeType == typeof(IgnoreDataMemberAttribute) ||
