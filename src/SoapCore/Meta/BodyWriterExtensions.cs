@@ -32,7 +32,7 @@ namespace SoapCore.Meta
 				exporter.ExportTypeMapping(xmlTypeMapping);
 				schemas.Compile(null, true);
 
-				var memoryStream = new MemoryStream();
+				using var memoryStream = new MemoryStream();
 				foreach (XmlSchema schema in schemas)
 				{
 					schema.Write(memoryStream);
@@ -126,7 +126,7 @@ namespace SoapCore.Meta
 					schema.Items.Add(element);
 				}
 
-				var memoryStream = new MemoryStream();
+				using var memoryStream = new MemoryStream();
 				schema.Write(memoryStream);
 				memoryStream.Position = 0;
 
@@ -146,7 +146,7 @@ namespace SoapCore.Meta
 		public static bool IsChoice(this MemberInfo member)
 		{
 			var choiceItem = member.GetCustomAttribute<XmlChoiceIdentifierAttribute>();
-			return choiceItem != null;
+			return choiceItem != null || member.GetCustomAttributes<XmlElementAttribute>().Count() > 1;
 		}
 
 		public static bool IsAttribute(this MemberInfo member)
@@ -220,14 +220,14 @@ namespace SoapCore.Meta
 				typeName = xmlTypeAttribute.TypeName;
 			}
 
-			if (type.IsArray)
+			if (type.IsArray || (typeof(IEnumerable).IsAssignableFrom(type) && type.IsGenericType))
 			{
-				typeName = GetArrayTypeName(typeName.Replace("[]", string.Empty), isNullableArray);
-			}
+				if (namedType.IsArray || (typeof(IEnumerable).IsAssignableFrom(type) && type.IsGenericType))
+				{
+					typeName = GetSerializedTypeName(namedType);
+				}
 
-			if (typeof(IEnumerable).IsAssignableFrom(type) && type.IsGenericType)
-			{
-				typeName = GetArrayTypeName(typeName, isNullableArray);
+				typeName = GetArrayTypeName(typeName.Replace("[]", string.Empty), isNullableArray);
 			}
 
 			return typeName;

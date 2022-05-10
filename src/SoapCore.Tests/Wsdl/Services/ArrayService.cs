@@ -26,6 +26,8 @@ namespace SoapCore.Tests.Wsdl.Services
 	{
 		public IEnumerable<long?> LongNullableEnumerable { get; set; }
 		public IEnumerable<long> LongEnumerable { get; set; }
+		public IEnumerable<IEnumerable<long>> LongEnumerableEnumerable { get; set; }
+		public IEnumerable<IEnumerable<string>> StringEnumerableEnumerable { get; set; }
 	}
 
 	[MessageContract]
@@ -33,5 +35,7 @@ namespace SoapCore.Tests.Wsdl.Services
 	{
 		public long?[] LongNullableArray { get; set; }
 		public long[] LongArray { get; set; }
+		public long[][] LongArrayArray { get; set; }
+		public List<List<string>> StringListList { get; set; }
 	}
 }

@@ -14,10 +14,12 @@ namespace SoapCore.Tests.WsdlFromFile
 	public class Startup
 	{
 		private readonly Type _serviceType;
+		private readonly string _wsdlFile;
 
 		public Startup(IStartupConfiguration configuration)
 		{
 			_serviceType = configuration.ServiceType;
+			_wsdlFile = configuration.WsdlFile;
 		}
 
 		public void ConfigureServices(IServiceCollection services)
@@ -27,7 +29,7 @@ namespace SoapCore.Tests.WsdlFromFile
 			services.AddMvc();
 		}
 
-#if ASPNET_21
+#if !NETCOREAPP3_0_OR_GREATER
 		public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
 		{
 			WsdlFileOptions options = new WsdlFileOptions
@@ -40,7 +42,7 @@ namespace SoapCore.Tests.WsdlFromFile
 						"Service.asmx", new WebServiceWSDLMapping
 						{
 							SchemaFolder = "/WsdlFromFile/WSDL",
-							WsdlFile = "SnapshotPull.wsdl",
+							WsdlFile = _wsdlFile,
 							WSDLFolder = "/WsdlFromFile/WSDL"
 						}
 					}
@@ -48,13 +50,12 @@ namespace SoapCore.Tests.WsdlFromFile
 				AppPath = env.ContentRootPath
 			};
 
-			app.UseSoapEndpoint(_serviceType, "/Service.svc", new BasicHttpBinding(), SoapSerializer.DataContractSerializer);
-			app.UseSoapEndpoint(_serviceType, "/Service.asmx", new BasicHttpBinding(), SoapSerializer.XmlSerializer, false, null, options);
+			app.UseSoapEndpoint(_serviceType, "/Service.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+			app.UseSoapEndpoint(_serviceType, "/Service.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer, false, null, options);
 
 			app.UseMvc();
 		}
-#endif
-#if ASPNET_30
+#else
 		public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
 		{
 			WsdlFileOptions options = new WsdlFileOptions
@@ -67,7 +68,7 @@ namespace SoapCore.Tests.WsdlFromFile
 						"Service.asmx", new WebServiceWSDLMapping
 						{
 							SchemaFolder = "/WsdlFromFile/WSDL",
-							WsdlFile = "SnapshotPull.wsdl",
+							WsdlFile = _wsdlFile,
 							WSDLFolder = "/WsdlFromFile/WSDL"
 						}
 					}
@@ -79,8 +80,8 @@ namespace SoapCore.Tests.WsdlFromFile
 
 			app.UseEndpoints(x =>
 			{
-				x.UseSoapEndpoint(_serviceType, "/Service.svc", new BasicHttpBinding(), SoapSerializer.DataContractSerializer);
-				x.UseSoapEndpoint(_serviceType, "/Service.asmx", new BasicHttpBinding(), SoapSerializer.XmlSerializer, false, null, options);
+				x.UseSoapEndpoint(_serviceType, "/Service.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+				x.UseSoapEndpoint(_serviceType, "/Service.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer, false, null, options);
 			});
 		}
 #endif

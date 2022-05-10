@@ -48,7 +48,6 @@ namespace SoapCore.Meta
 
 		private readonly ServiceDescription _service;
 		private readonly string _baseUrl;
-		private readonly Binding _binding;
 
 		private readonly string[] _numbers = new string[] { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 
@@ -65,11 +64,20 @@ namespace SoapCore.Meta
 		private bool _buildDataTable;
 		private string _schemaNamespace;
 
-		public MetaWCFBodyWriter(ServiceDescription service, string baseUrl, Binding binding) : base(isBuffered: true)
+		[Obsolete]
+		public MetaWCFBodyWriter(ServiceDescription service, string baseUrl, Binding binding)
+			: this(
+				  service,
+				  baseUrl,
+				  binding?.Name ?? "BasicHttpBinding_" + service.GeneralContract.Name,
+				  binding.HasBasicAuth())
+		{
+		}
+
+		public MetaWCFBodyWriter(ServiceDescription service, string baseUrl, string bindingName, bool hasBasicAuthentication) : base(isBuffered: true)
 		{
 			_service = service;
 			_baseUrl = baseUrl;
-			_binding = binding;
 
 			_arrayToBuild = new Queue<Type>();
 			_builtEnumTypes = new HashSet<string>();
@@ -80,18 +88,12 @@ namespace SoapCore.Meta
 			BindingType = service.GeneralContract.Name;
 			TargetNameSpace = service.GeneralContract.Namespace;
 
-			if (binding != null)
-			{
-				BindingName = binding.Name;
-				PortName = binding.Name;
-			}
-			else
-			{
-				BindingName = "BasicHttpBinding_" + BindingType;
-				PortName = "BasicHttpBinding_" + BindingType;
-			}
+			BindingName = bindingName;
+			PortName = bindingName;
+			HasBasicAuthentication = hasBasicAuthentication;
 		}
 
+		private bool HasBasicAuthentication { get; }
 		private string BindingName { get; }
 		private string BindingType { get; }
 		private string PortName { get; }
@@ -198,17 +200,46 @@ namespace SoapCore.Meta
 		{
 			foreach (ServiceKnownTypeAttribute knownType in serviceKnownTypes)
 			{
-				if (knownType.Type is null)
+				if (knownType.Type is not null)
 				{
-					throw new NotSupportedException($"Only type property of `{nameof(ServiceKnownTypeAttribute)}` is supported.");
+					AddKnownType(knownType.Type);
 				}
+				else if (knownType.DeclaringType is not null && !string.IsNullOrWhiteSpace(knownType.MethodName))
+				{
+					var method = knownType.DeclaringType.GetMethod(knownType.MethodName, BindingFlags.Static | BindingFlags.Public);
+					if (method is null)
+					{
+						throw new NotSupportedException($"Method `{knownType.MethodName}` doesn't exist on Type `{knownType.DeclaringType.FullName}`.");
+					}
 
-				// Add service known type
-				_complexTypeToBuild[knownType.Type] = GetDataContractNamespace(knownType.Type);
+					var knownTypeList = method.Invoke(null, new object[0]) as IEnumerable;
+					if (knownTypeList is null)
+					{
+						throw new NotSupportedException($"Method `{knownType.MethodName}` on Type `{knownType.DeclaringType.FullName}` returned null or not an IEnumerable.");
+					}
 
-				// Discover type known types
-				DiscoverTypes(knownType.Type, false);
+					foreach (var type in knownTypeList.OfType<Type>())
+					{
+						if (type != null)
+						{
+							AddKnownType(type);
+						}
+					}
+				}
+				else
+				{
+					throw new NotSupportedException($"You must specify Type property or DeclaringType and MethodName properties of `{nameof(ServiceKnownTypeAttribute)}`.");
+				}
 			}
+		}
+
+		private void AddKnownType(Type type)
+		{
+			// Add service known type
+			_complexTypeToBuild[type] = GetDataContractNamespace(type);
+
+			// Discover type known types
+			DiscoverTypes(type, false);
 		}
 
 		private void AddContractOperations(XmlDictionaryWriter writer, ContractDescription contract)
@@ -791,7 +822,7 @@ namespace SoapCore.Meta
 		{
 			var toBuildName = GetTypeName(type);
 
-			if (_builtComplexTypes.Contains(toBuildName))
+			if (_builtComplexTypes.Contains(type.FullName))
 			{
 				return;
 			}
@@ -916,7 +947,7 @@ namespace SoapCore.Meta
 
 			writer.WriteEndElement(); // xs:complexType
 
-			_builtComplexTypes.Add(toBuildName);
+			_builtComplexTypes.Add(type.FullName);
 		}
 
 		private void AddMessages(XmlDictionaryWriter writer)
@@ -1031,10 +1062,10 @@ namespace SoapCore.Meta
 			writer.WriteAttributeString("name", BindingName);
 			writer.WriteAttributeString("type", "tns:" + BindingType);
 
-			if (_binding.HasBasicAuth())
+			if (HasBasicAuthentication)
 			{
 				writer.WriteStartElement("wsp", "PolicyReference", Namespaces.WSP_NS);
-				writer.WriteAttributeString("URI", $"#{_binding.Name}_{BindingType}_policy");
+				writer.WriteAttributeString("URI", $"#{BindingName}_{BindingType}_policy");
 				writer.WriteEndElement();
 			}
 
@@ -1094,7 +1125,7 @@ namespace SoapCore.Meta
 		private void AddService(XmlDictionaryWriter writer)
 		{
 			writer.WriteStartElement("wsdl", "service", Namespaces.WSDL_NS);
-			writer.WriteAttributeString("name", _service.ServiceType.Name);
+			writer.WriteAttributeString("name", _service.ServiceName);
 
 			writer.WriteStartElement("wsdl", "port", Namespaces.WSDL_NS);
 			writer.WriteAttributeString("name", PortName);

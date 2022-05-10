@@ -13,7 +13,7 @@ using Moq;
 
 namespace SoapCore.Tests.RequestArgumentsOrder
 {
-	public class ServiceFixture<TOriginalParametersOrderService, TReversedParametersOrderService> : IDisposable
+	public sealed class ServiceFixture<TOriginalParametersOrderService, TReversedParametersOrderService> : IDisposable
 		where TOriginalParametersOrderService : class
 		where TReversedParametersOrderService : class
 	{
@@ -41,19 +41,17 @@ namespace SoapCore.Tests.RequestArgumentsOrder
 				})
 				.Configure(appBuilder =>
 				{
-#if ASPNET_21
-					appBuilder.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.svc", binding, SoapSerializer.DataContractSerializer);
-					appBuilder.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.asmx", binding, SoapSerializer.XmlSerializer);
+#if !NETCOREAPP3_0_OR_GREATER
+					appBuilder.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+					appBuilder.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer);
 					appBuilder.UseMvc();
-#endif
-
-#if ASPNET_30
+#else
 					appBuilder.UseRouting();
 
 					appBuilder.UseEndpoints(x =>
 					{
-						x.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.svc", binding, SoapSerializer.DataContractSerializer);
-						x.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.asmx", binding, SoapSerializer.XmlSerializer);
+						x.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.svc", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+						x.UseSoapEndpoint<TOriginalParametersOrderService>("/Service.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer);
 					});
 #endif
 				})
@@ -116,6 +114,7 @@ namespace SoapCore.Tests.RequestArgumentsOrder
 		public void Dispose()
 		{
 			_host.StopAsync();
+			_host.Dispose();
 		}
 
 		private Dictionary<SoapSerializer, TService> InitClients<TService>(BasicHttpBinding binding, string address)

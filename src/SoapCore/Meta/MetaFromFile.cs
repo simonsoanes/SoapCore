@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml;
 
 namespace SoapCore.Meta
@@ -37,6 +38,7 @@ namespace SoapCore.Meta
 		/// </summary>
 		public string ServerUrl { get; set; }
 
+		[Obsolete]
 		public string ReadLocalFile(string path)
 		{
 			if (!File.Exists(path))
@@ -44,11 +46,31 @@ namespace SoapCore.Meta
 				return string.Empty;
 			}
 
-			// read file
-			using var reader = new StreamReader(path);
-			var fileContents = reader.ReadToEnd();
-			return fileContents;
+			return File.ReadAllText(path);
 		}
+
+#if NETSTANDARD
+		public async Task<string> ReadLocalFileAsync(string path)
+		{
+			if (!File.Exists(path))
+			{
+				return string.Empty;
+			}
+
+			using var reader = File.OpenText(path);
+			return await reader.ReadToEndAsync();
+		}
+#else
+		public Task<string> ReadLocalFileAsync(string path)
+		{
+			if (!File.Exists(path))
+			{
+				return Task.FromResult(string.Empty);
+			}
+
+			return File.ReadAllTextAsync(path);
+		}
+#endif
 
 		public string ModifyWSDLAddRightSchemaPath(string xmlString)
 		{
@@ -63,17 +85,17 @@ namespace SoapCore.Meta
 					{
 						if (schemaNode.Name == (!string.IsNullOrWhiteSpace(schemaNode.Prefix) ? schemaNode.Prefix + ":" : schemaNode.Prefix) + "schema")
 						{
-							foreach (XmlNode importNode in schemaNode.ChildNodes)
+							foreach (XmlNode importOrIncludeNode in schemaNode.ChildNodes)
 							{
-								if (importNode.Name == (!string.IsNullOrWhiteSpace(importNode.Prefix) ? importNode.Prefix + ":" : importNode.Prefix) + "import")
+								if (importOrIncludeNode.Name == ImportNodeName(importOrIncludeNode) || importOrIncludeNode.Name == IncludeNodeName(importOrIncludeNode))
 								{
-									if (importNode.Attributes["schemaLocation"] == null)
+									if (importOrIncludeNode.Attributes["schemaLocation"] == null)
 									{
-										importNode.Attributes.Append(xmlDoc.CreateAttribute("schemaLocation"));
+										importOrIncludeNode.Attributes.Append(xmlDoc.CreateAttribute("schemaLocation"));
 									}
 
-									string name = importNode.Attributes["schemaLocation"].InnerText;
-									importNode.Attributes["schemaLocation"].InnerText = SchemaLocation() + "&name=" + name.Replace("./", string.Empty);
+									string name = importOrIncludeNode.Attributes["schemaLocation"].InnerText;
+									importOrIncludeNode.Attributes["schemaLocation"].InnerText = SchemaLocation() + "&name=" + name.Replace("./", string.Empty);
 								}
 							}
 						}
@@ -86,10 +108,18 @@ namespace SoapCore.Meta
 					{
 						if (schemaNode.Name == (!string.IsNullOrWhiteSpace(schemaNode.Prefix) ? schemaNode.Prefix + ":" : schemaNode.Prefix) + "port")
 						{
-							foreach (XmlNode soapAdressNode in schemaNode.ChildNodes)
+							foreach (XmlNode portNode in schemaNode.ChildNodes)
 							{
-								soapAdressNode.Attributes["location"].InnerText = WebServiceLocation();
-								break;
+								if (portNode.Name == (!string.IsNullOrWhiteSpace(portNode.Prefix) ? portNode.Prefix + ":" : portNode.Prefix) + "address")
+								{
+									if (portNode.Attributes["location"] == null)
+									{
+										portNode.Attributes.Append(xmlDoc.CreateAttribute("location"));
+									}
+
+									portNode.Attributes["location"].InnerText = WebServiceLocation();
+									break;
+								}
 							}
 						}
 					}
@@ -106,7 +136,7 @@ namespace SoapCore.Meta
 
 			foreach (XmlNode node in xmlDoc.DocumentElement.ChildNodes)
 			{
-				if (node.Name == (!string.IsNullOrWhiteSpace(node.Prefix) ? node.Prefix + ":" : node.Prefix) + "import")
+				if (node.Name == ImportNodeName(node) || node.Name == IncludeNodeName(node))
 				{
 					string name = node.Attributes["schemaLocation"].InnerText;
 					node.Attributes["schemaLocation"].InnerText = SchemaLocation() + "&name=" + name.Replace("./", string.Empty);
@@ -115,6 +145,10 @@ namespace SoapCore.Meta
 
 			return xmlDoc.InnerXml;
 		}
+
+		private static string ImportNodeName(XmlNode node) => (!string.IsNullOrWhiteSpace(node.Prefix) ? node.Prefix + ":" : node.Prefix) + "import";
+
+		private static string IncludeNodeName(XmlNode node) => (!string.IsNullOrWhiteSpace(node.Prefix) ? node.Prefix + ":" : node.Prefix) + "include";
 
 		private string SchemaLocation()
 		{

@@ -11,6 +11,7 @@ using SoapCore.Tests.Model;
 
 namespace SoapCore.Tests.MessageInspector
 {
+	[Obsolete]
 	[TestClass]
 	public class MessageInspectorTests
 	{
@@ -81,6 +82,15 @@ namespace SoapCore.Tests.MessageInspector
 			var client = CreateClient(new Dictionary<string, object>() { { "header1-key", "header1-value" } });
 			var result = client.Ping("hello, world");
 			Assert.IsTrue(MessageInspectorMock.AfterReceivedRequestCalled);
+		}
+
+		[TestMethod]
+		public void AfterReceivedRequestHasAction()
+		{
+			Assert.IsNull(MessageInspectorMock.Action);
+			var client = CreateClient(new Dictionary<string, object>() { { "header1-key", "header1-value" } });
+			var result = client.Ping("hello, world");
+			Assert.IsNotNull(MessageInspectorMock.Action);
 		}
 
 		[TestMethod]

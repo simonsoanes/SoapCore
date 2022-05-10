@@ -9,31 +9,34 @@ namespace SoapCore.Meta
 	{
 		private readonly Message _message;
 		private readonly ServiceDescription _service;
-		private readonly Binding _binding;
 		private readonly XmlNamespaceManager _xmlNamespaceManager;
+		private readonly string _bindingName;
+		private readonly bool _hasBasicAuthentication;
 
+		[Obsolete]
 		public MetaMessage(Message message, ServiceDescription service, Binding binding, XmlNamespaceManager xmlNamespaceManager)
+			: this(message, service, xmlNamespaceManager, binding?.Name, binding.HasBasicAuth())
+		{
+		}
+
+		public MetaMessage(Message message, ServiceDescription service, XmlNamespaceManager xmlNamespaceManager, string bindingName, bool hasBasicAuthentication)
 		{
 			_xmlNamespaceManager = xmlNamespaceManager;
 			_message = message;
 			_service = service;
-			_binding = binding;
+			_bindingName = bindingName;
+			_hasBasicAuthentication = hasBasicAuthentication;
 		}
 
-		public override MessageHeaders Headers
-		{
-			get { return _message.Headers; }
-		}
+		public override MessageHeaders Headers => _message.Headers;
 
-		public override MessageProperties Properties
-		{
-			get { return _message.Properties; }
-		}
+		public override MessageProperties Properties => _message.Properties;
 
-		public override MessageVersion Version
-		{
-			get { return _message.Version; }
-		}
+		public override MessageVersion Version => _message.Version;
+
+		public override bool IsEmpty => _message.IsEmpty;
+
+		public override bool IsFault => _message.IsFault;
 
 		protected override void OnWriteStartEnvelope(XmlDictionaryWriter writer)
 		{
@@ -55,7 +58,6 @@ namespace SoapCore.Meta
 				throw new ArgumentOutOfRangeException(nameof(Version), "Unsupported MessageVersion encountered while writing envelope.");
 			}
 
-			_xmlNamespaceManager.AddNamespace("tns", _service.GeneralContract.Namespace);
 			WriteXmlnsAttribute(writer, _service.GeneralContract.Namespace);
 			WriteXmlnsAttribute(writer, Namespaces.XMLNS_XSD);
 			WriteXmlnsAttribute(writer, Namespaces.HTTP_NS);
@@ -64,13 +66,13 @@ namespace SoapCore.Meta
 			WriteXmlnsAttribute(writer, Namespaces.WSU_NS);
 			WriteXmlnsAttribute(writer, Namespaces.WSAM_NS);
 			writer.WriteAttributeString("targetNamespace", _service.GeneralContract.Namespace);
-			writer.WriteAttributeString("name", _service.ServiceType.Name);
+			writer.WriteAttributeString("name", _service.ServiceName);
 			WriteXmlnsAttribute(writer, Namespaces.WSDL_NS);
 
-			if (_binding != null && _binding.HasBasicAuth())
+			if (_hasBasicAuthentication)
 			{
 				writer.WriteStartElement("Policy", Namespaces.WSP_NS);
-				writer.WriteAttributeString("Id", _xmlNamespaceManager.LookupPrefix(Namespaces.WSU_NS), $"{_binding.Name}_{_service.GeneralContract.Name}_policy");
+				writer.WriteAttributeString("Id", _xmlNamespaceManager.LookupPrefix(Namespaces.WSU_NS), $"{_bindingName}_{_service.GeneralContract.Name}_policy");
 				writer.WriteStartElement("ExactlyOne", Namespaces.WSP_NS);
 				writer.WriteStartElement("All", Namespaces.WSP_NS);
 				writer.WriteStartElement("BasicAuthentication", Namespaces.HTTP_NS);
@@ -90,9 +92,15 @@ namespace SoapCore.Meta
 			_message.WriteBodyContents(writer);
 		}
 
+		protected override void OnClose()
+		{
+			_message.Close();
+			base.OnClose();
+		}
+
 		private void WriteXmlnsAttribute(XmlDictionaryWriter writer, string namespaceUri)
 		{
-			string prefix = _xmlNamespaceManager.LookupPrefix(namespaceUri);
+			var prefix = string.IsNullOrEmpty(namespaceUri) ? null : _xmlNamespaceManager.LookupPrefix(namespaceUri);
 			writer.WriteXmlnsAttribute(prefix, namespaceUri);
 		}
 	}

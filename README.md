@@ -1,6 +1,6 @@
 # SoapCore
 
-[![NuGet Version](https://img.shields.io/nuget/v/SoapCore.svg)](https://www.nuget.org/packages/SoapCore/) 
+[![NuGet Version](https://img.shields.io/nuget/v/SoapCore.svg)](https://www.nuget.org/packages/SoapCore/) ![](https://github.com/DigDes/SoapCore/workflows/CI/badge.svg) [![Stack Overflow](https://img.shields.io/badge/stackoverflow-questions-blue?logo=stackoverflow)](https://stackoverflow.com/questions/tagged/soapcore)
 
 SOAP protocol middleware for ASP.NET Core
 
@@ -14,19 +14,17 @@ Support ref\out params, exceptions. Works with legacy SOAP\WCF-clients.
 
 The following frameworks are supported:
 
-- .NET Core 3.1 (using ASP.NET Core 3.0)
-- .NET Core 3.0 (using ASP.NET Core 3.0)
-- .NET Core 2.1 (using ASP.NET Core 2.1)
+- .NET 6.0 (using ASP.NET Core 6.0)
+- .NET 5.0 (using ASP.NET Core 5.0)
+- .NET Core 3.1 (using ASP.NET Core 3.1)
+- .NET Standard 2.1 (using ASP.NET Core 2.1)
 - .NET Standard 2.0 (using ASP.NET Core 2.1)
-
-.NET Core 2.2 / ASP.NET Core 2.2 is not explictly supported, but will probably work. We suggest upgrading to .NET Core 3.0 since .NET Core 2.2 is only supported until December 23, 2019.
-If you are using .NET Framework, and you cannot migrate to .NET Core, we recommend downgrading to ASP.net Core 2.1 since it's an LTS release and will be supported for some time.
 
 ### Installing
 
 `PM> Install-Package SoapCore`
 
-There are 2 different ways of adding SoapCore to your ASP.net Core website. If you are using ASP.NET Core 3.0 or higher with endpoint routing enabled (the default):
+There are 2 different ways of adding SoapCore to your ASP.NET Core website. If you are using ASP.NET Core 3.1 or higher with endpoint routing enabled (the default):
 
 In Startup.cs:
 
@@ -41,11 +39,11 @@ public void ConfigureServices(IServiceCollection services)
 
 public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
 {
-	app.UseRouting();
-	
-	app.UseEndpoints(endpoints => {
-		endpoints.UseSoapEndpoint<ServiceContractImpl>("/ServicePath.asmx", new BasicHttpBinding());
-	});
+    app.UseRouting();
+
+    app.UseEndpoints(endpoints => {
+        endpoints.UseSoapEndpoint<ServiceContractImpl>("/ServicePath.asmx", new SoapEncoderOptions(), SoapSerializer.DataContractSerializer);
+    });
     
 }
 ```
@@ -61,26 +59,13 @@ public void ConfigureServices(IServiceCollection services)
 }
 public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
 {
-    app.UseSoapEndpoint<ServiceContractImpl>("/ServicePath.asmx", new BasicHttpBinding());
-}
-```
-
-Program.cs
-```csharp
-public static void Main(string[] args)
-{
-    var host = new WebHostBuilder()
-        .UseKestrel()
-        .UseUrls("http://*:5050")
-        .UseStartup<Startup>()
-        .Build();
-    host.Run();
+    app.UseSoapEndpoint<ServiceContractImpl>("/ServicePath.asmx", new SoapEncoderOptions());
 }
 ```
 
 ### Using with legacy WCF/WS
 
-It is possible to use SoapCore with .net legacy WCF and Web Services, both as client and service.
+It is possible to use SoapCore with .NET legacy WCF and Web Services, both as client and service.
 
 Primary point here is to use XmlSerializer and properly markup messages and operations with xml serialization attributes. You may use legacy pre-generated wrappers to obtain these contracts or implement them manually. Extended example is available under serialization tests project.
 
@@ -121,7 +106,7 @@ var settings = Configuration.GetSection("FileWSDL").Get<WsdlFileOptions>();
 settings.AppPath = env.ContentRootPath; // The hosting environment root path
 ...
 
-app.UseSoapEndpoint<ServiceContractImpl>("/Service.asmx", new BasicHttpBinding(), SoapSerializer.XmlSerializer, false, null, settings);
+app.UseSoapEndpoint<ServiceContractImpl>("/Service.asmx", new SoapEncoderOptions(), SoapSerializer.XmlSerializer, false, null, settings);
 ```
 
 If the WsdFileOptions parameter is supplied then this feature is enabled / used.
@@ -137,6 +122,7 @@ If the WsdFileOptions parameter is supplied then this feature is enabled / used.
 In your ConfigureServices method, you can register some additional items to extend the pipeline:
 * services.AddSoapMessageInspector() - add a custom MessageInspector. This function is similar to the `IDispatchMessageInspector` in WCF. The newer `IMessageInspector2` interface allows you to register multiple inspectors, and to know which service was being called.
 * services.AddSingleton<MyOperatorInvoker>() - add a custom OperationInvoker. Similar to WCF's `IOperationInvoker` this allows you to override the invoking of a service operation, commonly to add custom logging or exception handling logic around it.
+* services.AddSoapMessageProcessor() - add a custom SoapMessageProcessor. Similar to ASP.NET Cores middlewares, this allows you to inspect the message on the way in and out. You can also short-circuit the message processing and return your own custom message instead.
 
 #### How to get custom HTTP header in SoapCore service
 
@@ -194,7 +180,7 @@ public class MyService : IMyServiceService
     private ThreadLocal<string> _paramValue = new ThreadLocal<string>() { Value = string.Empty };
 
     // ...
-    
+
     public void SetParameterForSomeOperation(string paramValue)
     {
         _paramValue.Value = paramValue;
@@ -206,6 +192,42 @@ public class MyService : IMyServiceService
     }
 }
 ```
+#### Additional namespace declaration attributes in envelope
+Adding additional namespaces to the **SOAP Envelope** can be done by populating `SoapEncoderOptions.AdditionalEnvelopeXmlnsAttributes` parameter.
+```csharp
+....
+endpoints.UseSoapEndpoint<IService>(opt =>
+{
+	opt.Path = "/ServiceWithAdditionalEnvelopeXmlnsAttributes.asmx";
+	opt.AdditionalEnvelopeXmlnsAttributes = new Dictionary<string, string>()
+	{
+		{ "myNS", "http://schemas.someting.org" },
+		{ "arr", "http://schemas.microsoft.com/2003/10/Serialization/Arrays" }
+	};
+});
+...
+```
+This code will put `xmlns:myNS="...` and `xmlns:arr="...` attributes in `Envelope` and message will look like:
+```xml
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" ... xmlns:myNS="http://schemas.someting.org" xmlns:arr="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+...
+    <myNS:StringList>
+        <arr:string>Error: one</arr:string>
+        <arr:string>Error: two</arr:string>
+    </fin:StringList>
+...
+```
+instead of:
+```xml
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" ... >
+...
+    <d3p1:StringList xmlns:d4p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+        <d4p1:string>Error: one</arr:string>
+        <d4p1:string>Error: two</arr:string>
+    </d3p1:StringList>
+...
+```
+
 ### Contributing
 
 See [Contributing guide](CONTRIBUTING.md)
@@ -216,5 +238,3 @@ See [Contributing guide](CONTRIBUTING.md)
 </a>
 
 Made with [contributors-img](https://contributors-img.web.app).
-
-![](https://github.com/DigDes/SoapCore/workflows/CI/badge.svg)
