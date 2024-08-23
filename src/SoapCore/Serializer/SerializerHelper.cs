@@ -1,16 +1,18 @@
 using System;
 using System.CodeDom;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Xml;
 using System.Xml.Serialization;
 using Microsoft.CSharp;
 
-namespace SoapCore
+namespace SoapCore.Serializer
 {
-	internal class SerializerHelper
+	internal class SerializerHelper : IXmlSerializationHandler
 	{
 		private readonly SoapSerializer _serializer;
 
@@ -20,7 +22,7 @@ namespace SoapCore
 		}
 
 		public object DeserializeInputParameter(
-			System.Xml.XmlDictionaryReader xmlReader,
+			XmlDictionaryReader xmlReader,
 			Type parameterType,
 			string parameterName,
 			string parameterNs,
@@ -28,7 +30,7 @@ namespace SoapCore
 			IEnumerable<Type> knownTypes = null)
 		{
 			// Advance past any whitespace.
-			while (xmlReader.NodeType == System.Xml.XmlNodeType.Whitespace && xmlReader.Read())
+			while (xmlReader.NodeType == XmlNodeType.Whitespace && xmlReader.Read())
 			{
 			}
 
@@ -41,7 +43,7 @@ namespace SoapCore
 					switch (_serializer)
 					{
 						case SoapSerializer.XmlSerializer:
-							if (!parameterType.IsArray)
+							if (!parameterType.IsArray || parameterType.GetElementType()?.IsArray == true)
 							{
 								// case [XmlElement("parameter")] int parameter
 								// case [XmlArray("parameter")] int[] parameter
@@ -72,7 +74,7 @@ namespace SoapCore
 			return null;
 		}
 
-		private static object DeserializeObject(System.Xml.XmlDictionaryReader xmlReader, Type parameterType, string parameterName, string parameterNs)
+		private static object DeserializeObject(XmlDictionaryReader xmlReader, Type parameterType, string parameterName, string parameterNs)
 		{
 			// see https://referencesource.microsoft.com/System.Xml/System/Xml/Serialization/XmlSerializer.cs.html#c97688a6c07294d5
 			var elementType = parameterType.GetElementType();
@@ -90,11 +92,19 @@ namespace SoapCore
 				return new MemoryStream(xmlReader.ReadContentAsBase64(), false);
 			}
 
+			if (elementType == typeof(XmlElement) || elementType == typeof(XmlNode))
+			{
+				var xmlDoc = new XmlDocument();
+				xmlDoc.LoadXml(xmlReader.ReadInnerXml());
+				var xmlNode = xmlDoc.FirstChild;
+				return xmlNode;
+			}
+
 			return serializer.Deserialize(xmlReader);
 		}
 
 		private static object DeserializeDataContract(
-			System.Xml.XmlDictionaryReader xmlReader,
+			XmlDictionaryReader xmlReader,
 			Type parameterType,
 			string parameterName,
 			string parameterNs,
@@ -114,7 +124,7 @@ namespace SoapCore
 			return serializer.ReadObject(xmlReader, verifyObjectName: true);
 		}
 
-		private XmlElementAttribute ChoiceElementToSerialize(System.Xml.XmlDictionaryReader xmlReader, XmlElementAttribute[] xmlElementAttributes, string parameterNs)
+		private XmlElementAttribute ChoiceElementToSerialize(XmlDictionaryReader xmlReader, XmlElementAttribute[] xmlElementAttributes, string parameterNs)
 		{
 			if (xmlElementAttributes != null && xmlElementAttributes.Length > 0)
 			{
@@ -130,7 +140,7 @@ namespace SoapCore
 			return null;
 		}
 
-		private object DeserializeArrayXmlSerializer(System.Xml.XmlDictionaryReader xmlReader, Type parameterType, string parameterName, string parameterNs, ICustomAttributeProvider customAttributeProvider)
+		private object DeserializeArrayXmlSerializer(XmlDictionaryReader xmlReader, Type parameterType, string parameterName, string parameterNs, ICustomAttributeProvider customAttributeProvider)
 		{
 			var xmlArrayAttributes = customAttributeProvider.GetCustomAttributes(typeof(XmlArrayItemAttribute), true);
 			XmlArrayItemAttribute xmlArrayItemAttribute = xmlArrayAttributes.FirstOrDefault() as XmlArrayItemAttribute;

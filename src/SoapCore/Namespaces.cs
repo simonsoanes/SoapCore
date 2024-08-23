@@ -18,6 +18,7 @@ namespace SoapCore
 		public const string SERIALIZATION_NS = "http://schemas.microsoft.com/2003/10/Serialization/";
 		public const string WSP_NS = "http://schemas.xmlsoap.org/ws/2004/09/policy";
 		public const string WSAM_NS = "http://www.w3.org/2007/05/addressing/metadata";
+		public const string WSAW_NS = "http://www.w3.org/2006/05/addressing/wsdl";
 		public const string SystemData_NS = "http://schemas.datacontract.org/2004/07/System.Data";
 		public const string MSC_NS = "http://schemas.microsoft.com/ws/2005/12/wsdl/contract";
 		public const string WSU_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd";
@@ -25,9 +26,10 @@ namespace SoapCore
 		public const string TRANSPORT_SCHEMA = "http://schemas.xmlsoap.org/soap/http";
 		public const string SOAP11_ENVELOPE_NS = "http://schemas.xmlsoap.org/soap/envelope/";
 		public const string SOAP12_ENVELOPE_NS = "http://www.w3.org/2003/05/soap-envelope";
+		public const string MICROSOFT_TYPES = "http://microsoft.com/wsdl/types/";
 #pragma warning restore SA1310 // Field names must not contain underscore
 
-		public static void AddDefaultNamespaces(XmlNamespaceManager xmlNamespaceManager)
+		public static void AddDefaultNamespaces(XmlNamespaceManager xmlNamespaceManager, bool addMicrosoftTypesNamespace)
 		{
 			AddNamespaceIfNotAlreadyPresentAndGetPrefix(xmlNamespaceManager, "xsd", Namespaces.XMLNS_XSD);
 			AddNamespaceIfNotAlreadyPresentAndGetPrefix(xmlNamespaceManager, "wsdl", Namespaces.WSDL_NS);
@@ -40,6 +42,11 @@ namespace SoapCore
 			AddNamespaceIfNotAlreadyPresentAndGetPrefix(xmlNamespaceManager, "soap12", Namespaces.SOAP12_NS);
 			AddNamespaceIfNotAlreadyPresentAndGetPrefix(xmlNamespaceManager, "ser", Namespaces.SERIALIZATION_NS);
 			AddNamespaceIfNotAlreadyPresentAndGetPrefix(xmlNamespaceManager, "wsam", Namespaces.WSAM_NS);
+
+			if (addMicrosoftTypesNamespace)
+			{
+				AddNamespaceIfNotAlreadyPresentAndGetPrefix(xmlNamespaceManager, "mst", Namespaces.MICROSOFT_TYPES);
+			}
 		}
 
 		public static string AddNamespaceIfNotAlreadyPresentAndGetPrefix(XmlNamespaceManager xmlNamespaceManager, string preferredPrefix, string uri)
@@ -66,10 +73,11 @@ namespace SoapCore
 			return existingPrefix;
 		}
 
-		public static XmlNamespaceManager CreateDefaultXmlNamespaceManager()
+		public static XmlNamespaceManager CreateDefaultXmlNamespaceManager(bool addMicrosoftTypesNamespace)
 		{
 			var xmlNamespaceManager = new XmlNamespaceManager(new NameTable());
-			AddDefaultNamespaces(xmlNamespaceManager);
+			AddDefaultNamespaces(xmlNamespaceManager, addMicrosoftTypesNamespace);
+
 			return xmlNamespaceManager;
 		}
 	}

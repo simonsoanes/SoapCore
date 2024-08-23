@@ -75,7 +75,7 @@ namespace SoapCore.Tests.WsdlFromFile
 			var addresses = _host.ServerFeatures.Get<IServerAddressesFeature>();
 			var address = addresses.Addresses.Single();
 
-			string url = address + "/Service.asmx";
+			string url = address + "/Management/Service.asmx";
 			Assert.IsNotNull(element);
 			Assert.AreEqual(element.Attributes["location"]?.Value, url);
 		}
@@ -100,7 +100,7 @@ namespace SoapCore.Tests.WsdlFromFile
 			var addresses = _host.ServerFeatures.Get<IServerAddressesFeature>();
 			var address = addresses.Addresses.Single();
 
-			string url = address + "/Service.asmx?xsd&name=DATEXII_3_MessageContainer.xsd";
+			string url = address + "/Management/Service.asmx?xsd&name=DATEXII_3_MessageContainer.xsd";
 
 			Assert.IsNotNull(element);
 			Assert.AreEqual(element.Attributes["namespace"]?.Value, "http://datex2.eu/schema/3/messageContainer");
@@ -162,7 +162,7 @@ namespace SoapCore.Tests.WsdlFromFile
 			_host = new WebHostBuilder()
 					.UseKestrel()
 					.UseUrls("http://127.0.0.1:0")
-					.ConfigureServices(services => services.AddSingleton<IStartupConfiguration>(new StartupConfiguration(serviceType, "SnapshotPull.wsdl")))
+					.ConfigureServices(services => services.AddSingleton<IStartupConfiguration>(new StartupConfiguration("Service", serviceType, "WSDL", "SnapshotPull.wsdl")))
 					.UseStartup<Startup>()
 					.Build();
 

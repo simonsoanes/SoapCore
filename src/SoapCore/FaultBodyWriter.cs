@@ -125,6 +125,12 @@ namespace SoapCore
 				{
 					writer.WriteElementString("faultcode", "s:Client");
 				}
+
+				var actor = faultException.CreateMessageFault()?.Actor;
+				if (!string.IsNullOrWhiteSpace(actor))
+                {
+                    writer.WriteElementString ("faultactor", actor);
+                }
 			}
 			else
 			{
@@ -152,15 +158,13 @@ namespace SoapCore
 				return null;
 			}
 
-			using (var ms = new MemoryStream())
-			{
-				var serializer = new DataContractSerializer(detailObject.GetType());
-				serializer.WriteObject(ms, detailObject);
-				ms.Position = 0;
-				var doc = new XmlDocument();
-				doc.Load(ms);
-				return doc.DocumentElement;
-			}
+			var ms = new MemoryStream();
+			var serializer = new DataContractSerializer(detailObject.GetType());
+			serializer.WriteObject(ms, detailObject);
+			ms.Position = 0;
+			var doc = new XmlDocument();
+			doc.Load(ms);
+			return doc.DocumentElement;
 		}
 
 		/// <summary>

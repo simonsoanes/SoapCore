@@ -12,11 +12,24 @@ namespace SoapCore.ServiceModel
 {
 	public class OperationDescription
 	{
-		public OperationDescription(ContractDescription contract, MethodInfo operationMethod, OperationContractAttribute contractAttribute)
+		public OperationDescription(ContractDescription contract, MethodInfo operationMethod, OperationContractAttribute contractAttribute, bool generateSoapActionWithoutContractName)
 		{
 			Contract = contract;
 			Name = contractAttribute.Name ?? GetNameByAction(contractAttribute.Action) ?? GetNameByMethod(operationMethod);
-			SoapAction = contractAttribute.Action ?? $"{contract.Namespace.TrimEnd('/')}/{contract.Name}/{Name}";
+
+			if (contractAttribute.Action != null)
+			{
+				SoapAction = contractAttribute.Action;
+			}
+			else if (generateSoapActionWithoutContractName)
+			{
+				SoapAction = $"{contract.Namespace.TrimEnd('/')}/{Name}";
+			}
+			else
+			{
+				SoapAction = $"{contract.Namespace.TrimEnd('/')}/{contract.Name}/{Name}";
+			}
+
 			IsOneWay = contractAttribute.IsOneWay;
 			DispatchMethod = operationMethod;
 
@@ -69,6 +82,9 @@ namespace SoapCore.ServiceModel
 				.ToArray();
 
 			ServiceKnownTypes = operationMethod.GetCustomAttributes<ServiceKnownTypeAttribute>(inherit: false);
+
+			var soapHeader = operationMethod.GetCustomAttributes<SoapHeaderAttribute>(inherit: false);
+			HeaderType = soapHeader.FirstOrDefault()?.GetType();
 		}
 
 		public ContractDescription Contract { get; private set; }
@@ -90,16 +106,41 @@ namespace SoapCore.ServiceModel
 		public IEnumerable<ServiceKnownTypeAttribute> ServiceKnownTypes { get; private set; }
 		public IEnumerable<ReturnChoice> ReturnChoices { get; private set; }
 		public bool ReturnsChoice => ReturnChoices != null;
+		public Type HeaderType { get; set; }
 
 		public IEnumerable<ServiceKnownTypeAttribute> GetServiceKnownTypesHierarchy()
 		{
 			foreach (ServiceKnownTypeAttribute serviceKnownType in ServiceKnownTypes)
 			{
+				if (serviceKnownType.Type == null && !string.IsNullOrEmpty(serviceKnownType.MethodName))
+				{
+					var method = serviceKnownType.DeclaringType.GetMethod(serviceKnownType.MethodName,BindingFlags.Public | BindingFlags.Static);
+					var types = (IEnumerable<Type>)method.Invoke(null, new object[]{method});
+					foreach (var t in types)
+					{
+						yield return new ServiceKnownTypeAttribute(t);
+					}
+
+					yield break;
+				}
+
 				yield return serviceKnownType;
 			}
 
 			foreach (ServiceKnownTypeAttribute serviceKnownType in Contract.ServiceKnownTypes)
 			{
+				if (serviceKnownType.Type == null && !string.IsNullOrEmpty(serviceKnownType.MethodName))
+				{
+					var method = serviceKnownType.DeclaringType.GetMethod(serviceKnownType.MethodName,BindingFlags.Public | BindingFlags.Static);
+					var types = (IEnumerable<Type>)method.Invoke(null, new object[]{method});
+					foreach (var t in types)
+					{
+						yield return new ServiceKnownTypeAttribute(t);
+					}
+
+					yield break;
+				}
+
 				yield return serviceKnownType;
 			}
 
@@ -109,6 +150,7 @@ namespace SoapCore.ServiceModel
 				yield return serviceKnownType;
 			}
 		}
+
 
 		private static SoapMethodParameterInfo CreateParameterInfo(ParameterInfo info, int index, ContractDescription contract)
 		{

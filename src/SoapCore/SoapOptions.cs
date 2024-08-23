@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ServiceModel.Channels;
 using System.Xml;
+using SoapCore.ServiceModel;
 using SoapCore.Extensibility;
 using SoapCore.Meta;
 
@@ -50,9 +51,17 @@ namespace SoapCore
 		/// </summary>
 		public bool HttpsPostEnabled { get; set; } = true;
 
+		public Type SerializerIdentifier { get; set; }
+
 		public bool OmitXmlDeclaration { get; set; } = true;
 
+		public bool? StandAloneAttribute { get; set; } = null;
+
 		public bool IndentXml { get; set; } = true;
+
+		public bool IndentWsdl { get; set; } = true;
+
+		public bool UseMicrosoftGuid { get; set; } = false;
 
 		/// <summary>
 		/// Gets or sets a value indicating whether to check to make sure that the XmlOutput doesn't contain invalid characters
@@ -63,6 +72,11 @@ namespace SoapCore
 		public XmlNamespaceManager XmlNamespacePrefixOverrides { get; set; }
 		public WsdlFileOptions WsdlFileOptions { get; set; }
 		public Dictionary<string, string> AdditionalEnvelopeXmlnsAttributes { get; set; }
+
+		public bool GenerateSoapActionWithoutContractName { get; set; } = false;
+
+		public bool NormalizeNewLines { get; set; } = true;
+		public IWsdlOperationNameGenerator WsdlOperationNameGenerator { get; set; } = new DefaultWsdlOperationNameGenerator();
 
 		[Obsolete]
 		public static SoapOptions FromSoapCoreOptions<T>(SoapCoreOptions opt)
@@ -85,12 +99,18 @@ namespace SoapCore
 				HttpGetEnabled = opt.HttpGetEnabled,
 				HttpPostEnabled = opt.HttpPostEnabled,
 				HttpsPostEnabled = opt.HttpsPostEnabled,
+				SerializerIdentifier = opt.SerializerIdentifier,
 				OmitXmlDeclaration = opt.OmitXmlDeclaration,
+				StandAloneAttribute = opt.StandAloneAttribute,
 				IndentXml = opt.IndentXml,
+				IndentWsdl = opt.IndentWsdl,
 				XmlNamespacePrefixOverrides = opt.XmlNamespacePrefixOverrides,
 				WsdlFileOptions = opt.WsdlFileOptions,
 				AdditionalEnvelopeXmlnsAttributes = opt.AdditionalEnvelopeXmlnsAttributes,
-				CheckXmlCharacters = opt.CheckXmlCharacters
+				CheckXmlCharacters = opt.CheckXmlCharacters,
+				UseMicrosoftGuid = opt.UseMicrosoftGuid,
+				GenerateSoapActionWithoutContractName = opt.GenerateSoapActionWithoutContractName,
+				NormalizeNewLines = opt.NormalizeNewLines,
 			};
 
 #pragma warning disable CS0612 // Type or member is obsolete

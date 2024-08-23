@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ServiceModel;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using Microsoft.AspNetCore.Mvc;
 using SoapCore.Tests.Model;
 
@@ -182,6 +183,181 @@ namespace SoapCore.Tests
 		public string EmpryBody(EmptyMembers members)
 		{
 			return "OK";
+		}
+
+		public IComplexTreeModelInput GetComplexModelInputFromKnownTypeProvider(ComplexModelInput value)
+		{
+			if (value is null)
+			{
+				throw new ArgumentNullException(nameof(value));
+			}
+
+			return new ComplexTreeModelInput()
+			{
+				Item = value
+			};
+		}
+
+		public XmlElement ReturnXmlElement()
+		{
+			XmlDocument xdOutput = new XmlDocument();
+			xdOutput.LoadXml("<TestXml/>");
+			return xdOutput.DocumentElement;
+		}
+
+		public XmlElement XmlElementInput(XmlElement input)
+		{
+			XmlDocument xdOutput = new XmlDocument();
+			if (input != null)
+			{
+				xdOutput.LoadXml("<Success/>");
+			}
+			else
+			{
+				xdOutput.LoadXml("<Failed/>");
+			}
+
+			return xdOutput.DocumentElement;
+		}
+
+		public IActionResult JwtAuthenticationAndAuthorizationIActionResultUnprotected(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult("Request object is empty.");
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult("Number is even.");
+			}
+			else
+			{
+				return new ObjectResult("Number is odd.")
+				{
+					StatusCode = 500
+				};
+			}
+		}
+
+		public IActionResult JwtAuthenticationAndAuthorizationIActionResultJustAuthenticated(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult("Request object is empty.");
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult("Number is even.");
+			}
+			else
+			{
+				return new ObjectResult("Number is odd.")
+				{
+					StatusCode = 500
+				};
+			}
+		}
+
+		public IActionResult JwtAuthenticationAndAuthorizationIActionResultUsingPolicy(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult("Request object is empty.");
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult("Number is even.");
+			}
+			else
+			{
+				return new ObjectResult("Number is odd.")
+				{
+					StatusCode = 500
+				};
+			}
+		}
+
+		public IActionResult JwtAuthenticationAndAuthorizationIActionResult(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult("Request object is empty.");
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult("Number is even.");
+			}
+			else
+			{
+				return new ObjectResult("Number is odd.")
+				{
+					StatusCode = 500
+				};
+			}
+		}
+
+		public ActionResult JwtAuthenticationAndAuthorizationActionResult(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult("Request object is empty.");
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult("Number is even.");
+			}
+			else
+			{
+				return new ObjectResult("Number is odd.")
+				{
+					StatusCode = 500
+				};
+			}
+		}
+
+		public ActionResult<string> JwtAuthenticationAndAuthorizationGenericActionResult(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult("Request object is empty.");
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult("Number is even.");
+			}
+			else
+			{
+				return new ObjectResult("Number is odd.")
+				{
+					StatusCode = 500
+				};
+			}
+		}
+
+		public ActionResult<ComplexModelInput> JwtAuthenticationAndAuthorizationComplexGenericActionResult(ComplexModelInput payload)
+		{
+			if (payload == null)
+			{
+				return new BadRequestObjectResult(new ComplexModelInput { StringProperty = "Request object is empty." });
+			}
+
+			if (payload.IntProperty % 2 == 0)
+			{
+				return new OkObjectResult(new ComplexModelInput { StringProperty = "Number is even." });
+			}
+			else
+			{
+				return new ObjectResult(new ComplexModelInput { StringProperty = "Number is odd." })
+				{
+					StatusCode = 500
+				};
+			}
 		}
 	}
 }

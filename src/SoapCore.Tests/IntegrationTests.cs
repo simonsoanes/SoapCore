@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
+using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SoapCore.Tests.Model;
@@ -213,6 +215,39 @@ namespace SoapCore.Tests
 		}
 
 		[TestMethod]
+		public void ComplexModelInputFromServiceKnownTypeProvider()
+		{
+			var client = CreateClient();
+			var input = new ComplexModelInput()
+			{
+				StringProperty = "test"
+			};
+			var output = client.GetComplexModelInputFromKnownTypeProvider(input);
+			Assert.IsInstanceOfType(output, typeof(ComplexTreeModelInput));
+			Assert.AreEqual(input.StringProperty, output.Item.StringProperty);
+		}
+
+		[TestMethod]
+		public void ReturnXmlElement()
+		{
+			var client = CreateClient();
+			var output = client.ReturnXmlElement();
+			Assert.IsInstanceOfType(output, typeof(XmlElement));
+			Assert.AreEqual(output.OuterXml, "<TestXml xmlns=\"\" />");
+		}
+
+		[TestMethod]
+		public void XmlElemetInput()
+		{
+			var client = CreateClient();
+			XmlDocument xdInput = new XmlDocument();
+			xdInput.LoadXml("<XmlTestInput/>");
+			var output = client.XmlElementInput(xdInput.DocumentElement);
+			Assert.IsInstanceOfType(output, typeof(XmlElement));
+			Assert.IsTrue(output.OuterXml.Contains("Success"));
+		}
+
+		[TestMethod]
 		public void ThrowsFaultException()
 		{
 			var client = CreateClient();
@@ -317,7 +352,7 @@ namespace SoapCore.Tests
 		private ITestService CreateSoap12Client()
 		{
 			var transport = new HttpTransportBindingElement();
-			var textencoding = new TextMessageEncodingBindingElement(MessageVersion.Soap12WSAddressing10, System.Text.Encoding.UTF8);
+			var textencoding = new TextMessageEncodingBindingElement(MessageVersion.Soap12WSAddressing10, Encoding.UTF8);
 			var binding = new CustomBinding(textencoding, transport);
 			var endpoint = new EndpointAddress(new Uri(string.Format("http://{0}:5050/Service.svc", "localhost")));
 			var channelFactory = new ChannelFactory<ITestService>(binding, endpoint);
